@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="La Bàn PT">
+<title>La Bàn Bát Trạch</title>
+<style>
+  :root { --bg:#f6f3ec; --card:#fff; --ink:#1b2238; --mute:#7a7f8c;
+          --dong:#1c6e45; --dongL:#dcefdf; --tay:#ba4a2e; --tayL:#fbe3d9; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14161c; --card:#1f222b; --ink:#eef0f5; --mute:#9aa0ad; --dongL:#21382b; --tayL:#40261f; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         padding:16px 16px calc(24px + env(safe-area-inset-bottom)); }
+  h1 { font-family:Georgia,serif; text-align:center; font-size:22px; margin:6px 0 10px; letter-spacing:.5px; }
+  .wrap { max-width:460px; margin:0 auto; }
+  .dialbox { position:relative; overflow:hidden; width:100%; aspect-ratio:1; margin:8px 0 14px; padding-top:14px; }
+  .pointer { position:absolute; left:50%; top:0; transform:translateX(-50%); width:0; height:0;
+             border-left:13px solid transparent; border-right:13px solid transparent; border-top:24px solid var(--dong); z-index:2; }
+  #dial { width:100%; height:100%; transition:transform .2s ease-out; }
+  .card { background:var(--card); border-radius:18px; padding:16px; display:grid; gap:12px; }
+  .row { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .big { font-family:Georgia,serif; font-size:32px; font-weight:700; }
+  .deg { font-size:32px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .badge { color:#fff; text-align:center; font-family:Georgia,serif; font-weight:800; font-size:19px; padding:10px; border-radius:12px; }
+  .members { text-align:center; padding:8px; border-radius:12px; font-size:15px; line-height:1.5; }
+  .members i { display:block; }
+  .lab { font-size:12px; color:var(--mute); }
+  .val { font-weight:600; }
+  button { width:100%; border:0; border-radius:12px; padding:14px; font-size:17px; font-weight:600; color:#fff; background:var(--dong); margin-top:14px; }
+  .note { font-size:13px; color:var(--mute); text-align:center; line-height:1.45; margin-top:14px; }
+  .warn { color:#d9822b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>LA BÀN BÁT TRẠCH</h1>
+  <div class="dialbox"><div class="pointer" id="pointer"></div><svg id="dial" viewBox="-100 -100 200 200"></svg></div>
+
+  <div class="card">
+    <div class="row"><span class="big" id="huong">—</span><span class="deg" id="deg">—</span></div>
+    <div class="row"><b id="cung" style="font-size:19px">Cung —</b><span class="lab" id="hanh" style="font-size:15px"></span></div>
+    <div class="badge" id="badge">—</div>
+    <div class="members" id="members"></div>
+    <div class="row">
+      <div><div class="lab">Sơn (24 sơn)</div><div class="val" id="son">—</div></div>
+      <div style="text-align:right"><div class="lab">Tọa (lưng nhà)</div><div class="val" id="toa">—</div></div>
+    </div>
+  </div>
+
+  <button id="btn">Bật la bàn</button>
+  <p class="note">Đặt điện thoại nằm ngang, đầu máy hướng ra cửa chính khi bạn đứng trong nhà nhìn ra. Tránh xa vật kim loại. Hướng đo theo Bắc từ.</p>
+  <p class="note warn" id="msg"></p>
+</div>
+
+<script>
+const CUNG = [
+  ["Bắc","B","Khảm","☵","Thủy"], ["Đông Bắc","ĐB","Cấn","☶","Thổ"],
+  ["Đông","Đ","Chấn","☳","Mộc"], ["Đông Nam","ĐN","Tốn","☴","Mộc"],
+  ["Nam","N","Ly","☲","Hỏa"],    ["Tây Nam","TN","Khôn","☷","Thổ"],
+  ["Tây","T","Đoài","☱","Kim"],  ["Tây Bắc","TB","Càn","☰","Kim"],
+].map(([huong,vt,que,ky,hanh],id)=>({id,huong,vt,que,ky,hanh,dong:[0,2,3,4].includes(id)}));
+const SON = ["Tý","Quý","Sửu","Cấn","Dần","Giáp","Mão","Ất","Thìn","Tốn","Tỵ","Bính",
+             "Ngọ","Đinh","Mùi","Khôn","Thân","Canh","Dậu","Tân","Tuất","Càn","Hợi","Nhâm"];
+const NHOM = {
+  dong:{ten:"ĐÔNG TỨ TRẠCH",huong:"Bắc • Đông • Nam • Đông Nam",que:"Khảm • Chấn • Ly • Tốn"},
+  tay: {ten:"TÂY TỨ TRẠCH", huong:"Tây • Tây Bắc • Tây Nam • Đông Bắc",que:"Đoài • Càn • Khôn • Cấn"},
+};
+const norm = d => ((d % 360) + 360) % 360;
+const cungTu = d => CUNG[Math.floor((norm(d)+22.5)/45)%8];
+const sonTu = d => SON[Math.floor((norm(d)+7.5)/15)%24];
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+const svg = document.getElementById("dial");
+const NS = "http://www.w3.org/2000/svg";
+const el = (t,a,txt)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;svg.appendChild(e);return e;};
+const pt = (deg,r)=>{const a=(deg-90)*Math.PI/180;return [Math.cos(a)*r,Math.sin(a)*r];};
+function sector(c,r1,r2,w){
+  const a0=c-w/2,a1=c+w/2,[x1,y1]=pt(a0,r2),[x2,y2]=pt(a1,r2),[x3,y3]=pt(a1,r1),[x4,y4]=pt(a0,r1);
+  return `M${x1} ${y1}A${r2} ${r2} 0 0 1 ${x2} ${y2}L${x3} ${y3}A${r1} ${r1} 0 0 0 ${x4} ${y4}Z`;
+}
+el("circle",{r:99,fill:css("--card"),stroke:css("--mute"),"stroke-width":.5});
+const sectors = CUNG.map(c=>{
+  const p=el("path",{d:sector(c.id*45,40,76,45),stroke:css("--card"),"stroke-width":1.5});
+  const g=document.createElementNS(NS,"g"); g.setAttribute("transform",`rotate(${c.id*45})`); svg.appendChild(g);
+  const t=(y,s,w,txt)=>{const e=document.createElementNS(NS,"text");Object.entries({y,"font-size":s,"font-weight":w,"text-anchor":"middle"}).forEach(([k,v])=>e.setAttribute(k,v));e.textContent=txt;g.appendChild(e);return e;};
+  const txt=[t(-64,11,400,c.ky),t(-54,8.5,700,c.que),t(-45,6.5,600,c.vt)];
+  return {c,p,txt};
+});
+for(let d=0;d<360;d+=3){
+  const L=d%45==0?8:d%15==0?5.5:3,[x1,y1]=pt(d,98.5),[x2,y2]=pt(d,98.5-L);
+  el("line",{x1,y1,x2,y2,stroke:d==0?"#d22":css("--mute"),"stroke-width":d%15==0?1:.5});
+}
+SON.forEach((s,i)=>el("text",{y:-82,"font-size":5.5,"text-anchor":"middle",fill:i==0?"#d22":css("--mute"),transform:`rotate(${i*15})`},s));
+el("circle",{r:39,fill:css("--bg")});
+el("text",{y:-23,"font-size":7,"font-weight":800,"text-anchor":"middle",fill:"#d22"},"BẮC");
+el("path",{d:"M0 -18 L-7 2 L0 -2 L7 2 Z",fill:"#d22"});
+
+let current=-1, rot=0, heading=null, started=false, locked=false;
+function render(h){
+  const delta = ((norm(h)-norm(rot))+540)%360-180; rot += delta;
+  svg.style.transform=`rotate(${-rot}deg)`;
+  const c=cungTu(h), n=c.dong?NHOM.dong:NHOM.tay, col=css(c.dong?"--dong":"--tay"), colL=css(c.dong?"--dongL":"--tayL");
+  document.getElementById("deg").textContent=Math.round(norm(h))%360+"°";
+  document.getElementById("son").textContent=sonTu(h);
+  if(c.id===current) return;
+  current=c.id;
+  if(navigator.vibrate) navigator.vibrate(10);
+  const toa=CUNG[(c.id+4)%8];
+  document.getElementById("huong").textContent=c.huong;
+  document.getElementById("cung").textContent=`Cung ${c.que} ${c.ky}`;
+  document.getElementById("hanh").textContent="Hành "+c.hanh;
+  document.getElementById("toa").textContent=`${toa.huong} – ${toa.que}`;
+  const b=document.getElementById("badge"); b.textContent=n.ten; b.style.background=col;
+  const m=document.getElementById("members"); m.innerHTML=`<b>${n.huong}</b><i>${n.que}</i>`; m.style.background=colL; m.style.color=col;
+  document.getElementById("pointer").style.borderTopColor=col;
+  document.getElementById("btn").style.background=locked?"#888":col;
+  sectors.forEach(({c:s,p,txt})=>{
+    const on=s.id===c.id, sc=css(s.dong?"--dong":"--tay"), sl=css(s.dong?"--dongL":"--tayL");
+    p.setAttribute("fill",on?sc:sl); txt.forEach(t=>t.setAttribute("fill",on?"#fff":sc));
+  });
+}
+render(0);
+
+function onOrient(e){
+  if(locked) return;
+  let h=null;
+  if(typeof e.webkitCompassHeading==="number") h=e.webkitCompassHeading;     // iPhone
+  else if(e.absolute && e.alpha!=null) h=360-e.alpha;                        // Android
+  if(h==null) return;
+  heading=h; render(h);
+  document.getElementById("msg").textContent = (e.webkitCompassAccuracy>25||e.webkitCompassAccuracy<0)
+    ? "Độ chính xác thấp – xoay điện thoại theo hình số 8 để hiệu chỉnh." : "";
+}
+const btn=document.getElementById("btn");
+btn.onclick=async()=>{
+  if(started){ locked=!locked; btn.textContent=locked?"Bỏ khóa hướng":"Khóa hướng"; current=-1; if(heading!=null) render(heading); return; }
+  try{
+    if(typeof DeviceOrientationEvent!=="undefined" && typeof DeviceOrientationEvent.requestPermission==="function"){
+      if(await DeviceOrientationEvent.requestPermission()!=="granted") throw new Error("Bạn chưa cho phép truy cập cảm biến hướng.");
+    }
+    window.addEventListener("deviceorientationabsolute",onOrient,true);
+    window.addEventListener("deviceorientation",onOrient,true);
+    started=true; btn.textContent="Khóa hướng";
+    setTimeout(()=>{ if(heading==null) document.getElementById("msg").textContent="Không đọc được la bàn. Hãy mở bằng Safari trên iPhone (cần https)."; },2500);
+  }catch(err){ document.getElementById("msg").textContent=err.message||String(err); }
+};
+</script>
+</body>
+</html>
